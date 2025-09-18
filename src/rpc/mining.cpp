@@ -1084,7 +1084,7 @@ UniValue getauxblock(const UniValue& params, bool fHelp)
         result.push_back(Pair("hash", block.GetHash().GetHex()));
         result.push_back(Pair("chainid", block.GetChainId()));
         result.push_back(Pair("previousblockhash", block.hashPrevBlock.GetHex()));
-        result.push_back(Pair("coinbasevalue", (int64_t)pblock->vtx[0].GetValueOut()));
+        result.push_back(Pair("coinbasevalue", (int64_t)block.vtx[0].vout[0].nValue));
         result.push_back(Pair("bits", strprintf("%08x", block.nBits)));
         result.push_back(Pair("height", static_cast<int64_t> (pindexPrev->nHeight + 1)));
         result.push_back(Pair("_target", HexStr(BEGIN(target), END(target))));
@@ -1219,11 +1219,11 @@ static UniValue AuxMiningCreateBlock(const CScript& scriptPubKey)
         throw std::runtime_error("invalid difficulty bits in block");
 
     UniValue result(UniValue::VOBJ);
-    result.push_back(Pair("hash", block.GetHash().GetHex()));
-    result.push_back(Pair("chainid", block.GetChainId()));
-    result.push_back(Pair("previousblockhash", block.hashPrevBlock.GetHex()));
-    result.push_back(Pair("coinbasevalue", (int64_t)pblock->vtx[0].GetValueOut()));
-    result.push_back(Pair("bits", strprintf("%08x", block.nBits)));
+    result.push_back(Pair("hash", pblock.GetHash().GetHex()));
+    result.push_back(Pair("chainid", pblock.GetChainId()));
+    result.push_back(Pair("previousblockhash", pblock.hashPrevBlock.GetHex()));
+    result.push_back(Pair("coinbasevalue", (int64_t)pblock.vtx[0].vout[0].nValue));
+    result.push_back(Pair("bits", strprintf("%08x", pblock.nBits)));
     result.push_back(Pair("height", static_cast<int64_t> (pindexPrev->nHeight + 1)));
     result.push_back(Pair("target", HexStr(BEGIN(target), END(target))));
 
