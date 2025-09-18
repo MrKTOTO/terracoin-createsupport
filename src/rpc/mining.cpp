@@ -1223,7 +1223,7 @@ static UniValue AuxMiningCreateBlock(const CScript& scriptPubKey)
     result.push_back(Pair("hash", pblock->GetHash().GetHex()));
     result.push_back(Pair("chainid", pblock->GetChainId()));
     result.push_back(Pair("previousblockhash", pblock->hashPrevBlock.GetHex()));
-    result.push_back(Pair("coinbasevalue", (int64_t)pblock->vtx[0]->vout[0].nValue));
+    result.push_back(Pair("coinbasevalue", (int64_t)block.vtx[0].vout[0].nValue));
     result.push_back(Pair("bits", strprintf("%08x", pblock->nBits)));
     result.push_back(Pair("height", static_cast<int64_t> (pindexPrev->nHeight + 1)));
     result.push_back(Pair("target", HexStr(BEGIN(target), END(target))));
@@ -1254,7 +1254,7 @@ static bool AuxMiningSubmitBlock(const std::string& hashHex, const std::string& 
 
     submitblock_StateCatcher sc(block.GetHash());
     RegisterValidationInterface(&sc);
-    boost::shared_ptr<const CBlock> shared_block
+    std::shared_ptr<const CBlock> shared_block
       = std::make_shared<const CBlock>(block);
     bool fAccepted = ProcessNewBlock(Params(), shared_block, true, nullptr);
     UnregisterValidationInterface(&sc);
