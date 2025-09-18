@@ -1264,7 +1264,7 @@ static bool AuxMiningSubmitBlock(const std::string& hashHex, const std::string& 
 UniValue createauxblock(const UniValue& params, bool fHelp)
 {
     if (fHelp || params.size() != 1)
-        throw std::runtime_error(
+        throw runtime_error(
             "createauxblock <address>\n"
             "\ncreate a new block and return information required to merge-mine it.\n"
             "\nArguments:\n"
@@ -1278,7 +1278,7 @@ UniValue createauxblock(const UniValue& params, bool fHelp)
             "  \"bits\"               (string) compressed target of the block\n"
             "  \"height\"             (numeric) height of the block\n"
             "  \"target\"             (string) target in reversed byte order\n"
-            + "}\n"
+            "}\n"
             "\nExamples:\n"
             + HelpExampleCli("createauxblock", "\"address\"")
             + HelpExampleRpc("createauxblock", "\"address\"")
@@ -1297,7 +1297,7 @@ UniValue createauxblock(const UniValue& params, bool fHelp)
 UniValue submitauxblock(const UniValue& params, bool fHelp)
 {
     if (fHelp || params.size() != 2)
-        throw std::runtime_error(
+        throw runtime_error(
             "submitauxblock <hash> <auxpow>\n"
             "\nsubmit a solved auxpow for a previously block created by 'createauxblock'.\n"
             "\nArguments:\n"
