@@ -1184,8 +1184,7 @@ static UniValue AuxMiningCreateBlock(const CScript& scriptPubKey)
             }
 
             // Create new block with nonce = 0 and extraNonce = 1
-            std::unique_ptr<CBlockTemplate> newBlock
-                = BlockAssembler(Params()).CreateNewBlock(scriptPubKey, fMineWitnessTx);
+            std::unique_ptr<CBlockTemplate> newBlock = CreateNewBlock(Params(), scriptPubKey);
             if (!newBlock)
                 throw JSONRPCError(RPC_OUT_OF_MEMORY, "out of memory");
 
@@ -1196,7 +1195,7 @@ static UniValue AuxMiningCreateBlock(const CScript& scriptPubKey)
 
             // Finalise it by setting the version and building the merkle root
             IncrementExtraNonce(&newBlock->block, pindexPrev, nExtraNonce);
-            newBlock->block.SetAuxpowFlag(true);
+            newBlock->block.SetAuxpow(new CAuxPow(true));;
 
             // Save
             pblock = &newBlock->block;
@@ -1223,7 +1222,7 @@ static UniValue AuxMiningCreateBlock(const CScript& scriptPubKey)
     result.push_back(Pair("hash", pblock->GetHash().GetHex()));
     result.push_back(Pair("chainid", pblock->GetChainId()));
     result.push_back(Pair("previousblockhash", pblock->hashPrevBlock.GetHex()));
-    result.push_back(Pair("coinbasevalue", (int64_t)block.vtx[0].vout[0].nValue));
+    result.push_back(Pair("coinbasevalue", (int64_t)pblock.vtx[0].vout[0].nValue));
     result.push_back(Pair("bits", strprintf("%08x", pblock->nBits)));
     result.push_back(Pair("height", static_cast<int64_t> (pindexPrev->nHeight + 1)));
     result.push_back(Pair("target", HexStr(BEGIN(target), END(target))));
