@@ -1165,6 +1165,7 @@ static UniValue AuxMiningCreateBlock(const CScript& scriptPubKey)
     CScriptID scriptID (scriptPubKey);
     auto iter = curBlocks.find(scriptID);
     if (iter != curBlocks.end()) pblock = iter->second;
+    static CBlockTemplate* pblocktemplate;
 
     {
         LOCK(cs_main);
@@ -1184,8 +1185,8 @@ static UniValue AuxMiningCreateBlock(const CScript& scriptPubKey)
             }
 
             // Create new block with nonce = 0 and extraNonce = 1
-            std::unique_ptr<CBlockTemplate> newBlock = CreateNewBlock(Params(), scriptPubKey);
-            if (!newBlock)
+            pblocktemplate = CreateNewBlock(Params(), coinbaseScript->reserveScript);
+            if (!pblocktemplate)
                 throw JSONRPCError(RPC_OUT_OF_MEMORY, "out of memory");
 
             // Update state only when CreateNewBlock succeeded
@@ -1194,14 +1195,13 @@ static UniValue AuxMiningCreateBlock(const CScript& scriptPubKey)
             nStart = GetTime();
 
             // Finalise it by setting the version and building the merkle root
-            IncrementExtraNonce(&newBlock->block, pindexPrev, nExtraNonce);
-            newBlock->block.SetAuxpow(new CAuxPow(true));;
+            CBlock* pblock = &pblocktemplate->block;
+            IncrementExtraNonce(pblock, pindexPrev, nExtraNonce);
+            pblock->SetAuxpowVersion(true);
 
             // Save
-            pblock = &newBlock->block;
-            curBlocks[scriptID] = pblock;
             mapNewBlock[pblock->GetHash()] = pblock;
-            vNewBlockTemplate.push_back(std::move(newBlock));
+            vNewBlockTemplate.push_back(pblocktemplate);
         }
     }
 
