@@ -1278,7 +1278,6 @@ UniValue createauxblock(const UniValue& params, bool fHelp)
             "  \"bits\"               (string) compressed target of the block\n"
             "  \"height\"             (numeric) height of the block\n"
             "  \"target\"             (string) target in reversed byte order\n"
-            )
             + "}\n"
             "\nExamples:\n"
             + HelpExampleCli("createauxblock", "\"address\"")
