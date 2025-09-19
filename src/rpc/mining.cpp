@@ -1140,7 +1140,7 @@ void AuxMiningCheck()
     {
         LOCK(cs_main);
         if (chainActive.Height() + 1 < Params().GetConsensus().nAuxpowStartHeight)
-            throw std::runtime_error("getauxblock method is not yet available");
+            throw std::runtime_error("createauxblock method is not yet available");
     }
 }
 
@@ -1149,86 +1149,78 @@ static UniValue AuxMiningCreateBlock(const CScript& scriptPubKey)
 
     AuxMiningCheck();
     LOCK(cs_auxblockCache);
+/* The variables below are used to keep track of created and not yet
+       submitted auxpow blocks.  Lock them to be sure even for multiple
+       RPC threads running in parallel.  */
+    static CCriticalSection cs_auxblockCache;
+    LOCK(cs_auxblockCache);
+    static std::map<uint256, CBlock*> mapNewBlock;
+    static std::vector<CBlockTemplate*> vNewBlockTemplate;
 
-    static unsigned nTransactionsUpdatedLast;
-    static const CBlockIndex* pindexPrev = nullptr;
-    static uint64_t nStart;
-    static std::map<CScriptID, CBlock*> curBlocks;
-    static unsigned nExtraNonce = 0;
-
-    /* Search for cached blocks with given scriptPubKey and assign it to pBlock
-     * if we find a match. This allows for creating multiple aux templates with
-     * a single dingocoind instance, for example when a pool runs multiple sub-
-     * pools with different payout strategies.
-     */
-    CBlock* pblock = nullptr;
-    CScriptID scriptID (scriptPubKey);
-    auto iter = curBlocks.find(scriptID);
-    if (iter != curBlocks.end()) pblock = iter->second;
-    CBlockTemplate* pblocktemplate = nullptr;
-
+    /* Create a new block?  */
+    if (params.size() == 0)
     {
-        LOCK(cs_main);
+        static unsigned nTransactionsUpdatedLast;
+        static const CBlockIndex* pindexPrev = NULL;
+        static uint64_t nStart;
+        static CBlockTemplate* pblocktemplate;
+        static unsigned nExtraNonce = 0;
 
         // Update block
-        if (pblock == nullptr || pindexPrev != chainActive.Tip()
-            || (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast
-                && GetTime() - nStart > 60))
         {
-            if (pindexPrev != chainActive.Tip())
+            LOCK(cs_main);
+            if (pindexPrev != chainActive.Tip()
+                || (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast
+                    && GetTime() - nStart > 60))
             {
-                // Clear old blocks since they're obsolete now.
-                mapNewBlock.clear();
-                vNewBlockTemplate.clear();
-                curBlocks.clear();
-                pblock = nullptr;
+                if (pindexPrev != chainActive.Tip())
+                {
+                    // Deallocate old blocks since they're obsolete now
+                    mapNewBlock.clear();
+                    BOOST_FOREACH(CBlockTemplate* pbt, vNewBlockTemplate)
+                        delete pbt;
+                    vNewBlockTemplate.clear();
+                }
+        
+                // Create new block with nonce = 0 and extraNonce = 1
+                pblocktemplate = CreateNewBlock(Params(), scriptPubKey);
+                if (!pblocktemplate)
+                    throw JSONRPCError(RPC_OUT_OF_MEMORY, "out of memory");
+        
+                // Update state only when CreateNewBlock succeeded
+                nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
+                pindexPrev = chainActive.Tip();
+                nStart = GetTime();
+        
+                // Finalise it by setting the version and building the merkle root
+                CBlock* pblock = &pblocktemplate->block;
+                IncrementExtraNonce(pblock, pindexPrev, nExtraNonce);
+                pblock->SetAuxpowVersion(true);
+        
+                // Save
+                mapNewBlock[pblock->GetHash()] = pblock;
+                vNewBlockTemplate.push_back(pblocktemplate);
             }
-
-            // Create new block with nonce = 0 and extraNonce = 1
-            pblocktemplate = CreateNewBlock(Params(), scriptPubKey);
-            if (!pblocktemplate)
-                throw JSONRPCError(RPC_OUT_OF_MEMORY, "out of memory");
-
-            // Update state only when CreateNewBlock succeeded
-            nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
-            pindexPrev = chainActive.Tip();
-            nStart = GetTime();
-
-            // Finalise it by setting the version and building the merkle root
-            pblock = &pblocktemplate->block;
-            IncrementExtraNonce(pblock, pindexPrev, nExtraNonce);
-            pblock->SetAuxpowVersion(true);
-
-            // Save
-            mapNewBlock[pblock->GetHash()] = pblock;
-            vNewBlockTemplate.push_back(std::unique_ptr<CBlockTemplate>(pblocktemplate));
-            curBlocks[scriptID] = pblock;
         }
-    }
-
-    // At this point, pblock is always initialised:  If we make it here
-    // without creating a new block above, it means that, in particular,
-    // pindexPrev == chainActive.Tip().  But for that to happen, we must
-    // already have created a pblock in a previous call, as pindexPrev is
-    // initialised only when pblock is.
-    assert(pblock);
-
-    arith_uint256 target;
-    bool fNegative, fOverflow;
-    target.SetCompact(pblock->nBits, &fNegative, &fOverflow);
-    if (fNegative || fOverflow || target == 0)
-        throw std::runtime_error("invalid difficulty bits in block");
-
-    UniValue result(UniValue::VOBJ);
-    result.push_back(Pair("hash", pblock->GetHash().GetHex()));
-    result.push_back(Pair("chainid", pblock->GetChainId()));
-    result.push_back(Pair("previousblockhash", pblock->hashPrevBlock.GetHex()));
-    result.push_back(Pair("coinbasevalue", (int64_t)pblock->vtx[0].vout[0].nValue));
-    result.push_back(Pair("bits", strprintf("%08x", pblock->nBits)));
-    result.push_back(Pair("height", static_cast<int64_t> (pindexPrev->nHeight + 1)));
-    result.push_back(Pair("target", HexStr(BEGIN(target), END(target))));
-
-    return result;
+        
+        const CBlock& block = pblocktemplate->block;
+        
+        arith_uint256 target;
+        bool fNegative, fOverflow;
+        target.SetCompact(block.nBits, &fNegative, &fOverflow);
+        if (fNegative || fOverflow || target == 0)
+            throw std::runtime_error("invalid difficulty bits in block");
+        
+        UniValue result(UniValue::VOBJ);
+        result.push_back(Pair("hash", block.GetHash().GetHex()));
+        result.push_back(Pair("chainid", block.GetChainId()));
+        result.push_back(Pair("previousblockhash", block.hashPrevBlock.GetHex()));
+        result.push_back(Pair("coinbasevalue", (int64_t)block.vtx[0].vout[0].nValue));
+        result.push_back(Pair("bits", strprintf("%08x", block.nBits)));
+        result.push_back(Pair("height", static_cast<int64_t> (pindexPrev->nHeight + 1)));
+        result.push_back(Pair("target", HexStr(BEGIN(target), END(target))));
+        
+        return result;
 }
 
 static bool AuxMiningSubmitBlock(const std::string& hashHex, const std::string& auxpowHex)
