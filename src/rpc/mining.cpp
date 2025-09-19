@@ -1195,7 +1195,7 @@ static UniValue AuxMiningCreateBlock(const CScript& scriptPubKey)
             nStart = GetTime();
 
             // Finalise it by setting the version and building the merkle root
-            CBlock* pblock = &pblocktemplate->block;
+            pblock = &pblocktemplate->block;
             IncrementExtraNonce(pblock, pindexPrev, nExtraNonce);
             pblock->SetAuxpowVersion(true);
 
