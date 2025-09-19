@@ -318,6 +318,8 @@ static const CRPCCommand vRPCCommands[] =
     { "mining",             "getblocktemplate",       &getblocktemplate,       true  },
     { "mining",             "submitblock",            &submitblock,            true  },
     { "mining",             "getauxblock",            &getauxblock,            true  },
+    { "mining",             "createauxblock",            &createauxblock,            true  },
+    { "mining",             "submitauxblock",            &submitauxblock,            true  },
 
     /* Coin generation */
     { "generating",         "getgenerate",            &getgenerate,            true  },
