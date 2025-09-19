@@ -1165,7 +1165,7 @@ static UniValue AuxMiningCreateBlock(const CScript& scriptPubKey)
     CScriptID scriptID (scriptPubKey);
     auto iter = curBlocks.find(scriptID);
     if (iter != curBlocks.end()) pblock = iter->second;
-    static CBlockTemplate* pblocktemplate;
+    CBlockTemplate* pblocktemplate = nullptr;
 
     {
         LOCK(cs_main);
@@ -1201,7 +1201,8 @@ static UniValue AuxMiningCreateBlock(const CScript& scriptPubKey)
 
             // Save
             mapNewBlock[pblock->GetHash()] = pblock;
-            vNewBlockTemplate.push_back(pblocktemplate);
+            vNewBlockTemplate.push_back(std::unique_ptr<CBlockTemplate>(pblocktemplate));
+            curBlocks[scriptID] = pblock;
         }
     }
 
@@ -1219,11 +1220,11 @@ static UniValue AuxMiningCreateBlock(const CScript& scriptPubKey)
         throw std::runtime_error("invalid difficulty bits in block");
 
     UniValue result(UniValue::VOBJ);
-    result.push_back(Pair("hash", pblock.GetHash().GetHex()));
-    result.push_back(Pair("chainid", pblock.GetChainId()));
-    result.push_back(Pair("previousblockhash", pblock.hashPrevBlock.GetHex()));
-    result.push_back(Pair("coinbasevalue", (int64_t)pblock.vtx[0].vout[0].nValue));
-    result.push_back(Pair("bits", strprintf("%08x", pblock.nBits)));
+    result.push_back(Pair("hash", pblock->GetHash().GetHex()));
+    result.push_back(Pair("chainid", pblock->GetChainId()));
+    result.push_back(Pair("previousblockhash", pblock->hashPrevBlock.GetHex()));
+    result.push_back(Pair("coinbasevalue", (int64_t)pblock->vtx[0].vout[0].nValue));
+    result.push_back(Pair("bits", strprintf("%08x", pblock->nBits)));
     result.push_back(Pair("height", static_cast<int64_t> (pindexPrev->nHeight + 1)));
     result.push_back(Pair("target", HexStr(BEGIN(target), END(target))));
 
@@ -1255,7 +1256,7 @@ static bool AuxMiningSubmitBlock(const std::string& hashHex, const std::string& 
     RegisterValidationInterface(&sc);
     std::shared_ptr<const CBlock> shared_block
       = std::make_shared<const CBlock>(block);
-    bool fAccepted = ProcessNewBlock(Params(), shared_block, true, NULL, NULL);
+    bool fAccepted = ProcessNewBlock(Params(), shared_block.get(), true, NULL, NULL);
     UnregisterValidationInterface(&sc);
 
     return fAccepted;
