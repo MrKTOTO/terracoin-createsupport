@@ -1170,14 +1170,12 @@ static UniValue AuxMiningCreateBlock(const CScript& scriptPubKey)
             {
                 // Deallocate old blocks since they're obsolete now
                 mapNewBlock.clear();
-                BOOST_FOREACH(CBlockTemplate* pbt, vNewBlockTemplate)
-                    delete pbt;
                 vNewBlockTemplate.clear();
             }
     
             // Create new block with nonce = 0 and extraNonce = 1
-            pblocktemplate = CreateNewBlock(Params(), scriptPubKey);
-            if (!pblocktemplate)
+            std::unique_ptr<CBlockTemplate> newBlock(CreateNewBlock(Params(), scriptPubKey));
+            if (!newBlock)
                 throw JSONRPCError(RPC_OUT_OF_MEMORY, "out of memory");
     
             // Update state only when CreateNewBlock succeeded
@@ -1186,17 +1184,20 @@ static UniValue AuxMiningCreateBlock(const CScript& scriptPubKey)
             nStart = GetTime();
     
             // Finalise it by setting the version and building the merkle root
-            CBlock* pblock = &pblocktemplate->block;
+            CBlock* pblock = &newBlock->block;
             IncrementExtraNonce(pblock, pindexPrev, nExtraNonce);
             pblock->SetAuxpowVersion(true);
     
             // Save
             mapNewBlock[pblock->GetHash()] = pblock;
-            vNewBlockTemplate.push_back(pblocktemplate);
+            vNewBlockTemplate.push_back(std::move(newBlock));
         }
     }
+    
+    if (vNewBlockTemplate.empty())
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "no block template available");
         
-    const CBlock& block = pblocktemplate->block;
+    const CBlock& block = vNewBlockTemplate.back()->block;
     
     arith_uint256 target;
     bool fNegative, fOverflow;
@@ -1237,12 +1238,15 @@ static bool AuxMiningSubmitBlock(const std::string& hashHex, const std::string& 
     block.SetAuxpow(new CAuxPow(pow));
     assert(block.GetHash() == hash);
 
-    submitblock_StateCatcher sc(block.GetHash());
-    RegisterValidationInterface(&sc);
-    std::shared_ptr<const CBlock> shared_block
-      = std::make_shared<const CBlock>(block);
-    bool fAccepted = ProcessNewBlock(Params(), shared_block.get(), true, NULL, NULL);
-    UnregisterValidationInterface(&sc);
+    const bool fAccepted = ProcessBlockFound(&block, Params());
+
+    // submitblock_StateCatcher sc(block.GetHash());
+    // RegisterValidationInterface(&sc);
+    // std::shared_ptr<const CBlock> shared_block
+    //   = std::make_shared<const CBlock>(block);
+    // bool fAccepted = ProcessNewBlock(Params(), shared_block.get(), true, NULL, NULL);
+    // UnregisterValidationInterface(&sc);
+    
 
     return fAccepted;
 }
