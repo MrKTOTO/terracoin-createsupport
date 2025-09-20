@@ -1148,14 +1148,10 @@ static UniValue AuxMiningCreateBlock(const CScript& scriptPubKey)
 {
 
     AuxMiningCheck();
-    LOCK(cs_auxblockCache);
 /* The variables below are used to keep track of created and not yet
        submitted auxpow blocks.  Lock them to be sure even for multiple
        RPC threads running in parallel.  */
-    static CCriticalSection cs_auxblockCache;
     LOCK(cs_auxblockCache);
-    static std::map<uint256, CBlock*> mapNewBlock;
-    static std::vector<CBlockTemplate*> vNewBlockTemplate;
 
     static unsigned nTransactionsUpdatedLast;
     static const CBlockIndex* pindexPrev = NULL;
